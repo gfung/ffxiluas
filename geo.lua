@@ -66,11 +66,14 @@ end)
 
 healerCasting = 0
 
+casting = 0
+
 windower.register_event('prerender', function()
     local t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
     local s = windower.ffxi.get_mob_by_target('me')
     local moblist={"Eschan Bugard","Eschan Tarichuk"}
 
+    -- print(s.status)
     -- ||linkshell||superior_level||vitals||main_job_full
     -- ||job_points||main_job||sub_job_full||
     -- merits||sub_job_level||main_job_level
@@ -98,101 +101,109 @@ windower.register_event('prerender', function()
             windower.send_command('setkey s up;')
         end
 
-        -- check buffs/debuffs
-        
-        if has_value(windower.ffxi.get_player().buffs, 15) then
-            if not healerCasting then
-                windower.send_command('send Tuxxy /ma \"Cursna\"'..s.name)
-                healerCasting = 1
+        if windower.ffxi.get_player().main_job ==  'RDM' then 
+            if not has_value(windower.ffxi.get_player().buffs, 419) then
+                windower.send_command('input /ja \"Composure\" <me>')
             end
-        end
-        -- if not has_value(windower.ffxi.get_player().buffs, 33) then
-        --     windower.send_command('input /ma \"Haste II\" <me>')
-        -- end
-        -- if not has_value(windower.ffxi.get_player().buffs, 95) then
-        --     windower.send_command('input /ma \"Enblizzard\" <me>')
-        -- end
-        -- if not has_value(windower.ffxi.get_player().buffs, 419) then
-        --     windower.send_command('input /ja \"Composure\" <me>')
-        -- end
-        -- if not has_value(windower.ffxi.get_player().buffs, 43) then
-        --     windower.send_command('input /ma \"Refresh II\" <me>')
-        -- end
+            -- check buffs
+            
+            if (casting == 0) then
+                if not has_value(windower.ffxi.get_player().buffs, 33) then
+                    windower.send_command('input /ma \"Haste II\" <me>')
+                    casting = 1
+                end
+                if not has_value(windower.ffxi.get_player().buffs, 95) then
+                    windower.send_command('input /ma \"Enblizzard\" <me>')
+                    casting = 1
+                end
+                
+                if not has_value(windower.ffxi.get_player().buffs, 43) then
+                    windower.send_command('input /ma \"Refresh II\" <me>')
+                    casting = 1
+                end
+            end
+        end 
     else
     end
     -- get new target
-    -- if (s.status == 0 and t==nil) then
-    --     aid = ''
-    --     adist = 50
-    --     aindex = ''
-    --     -- find closest?
-    --     local list = windower.ffxi.get_mob_array()
-    --     local t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
+    if (s.status == 0 and t==nil) then
+        aid = ''
+        adist = 50
+        aindex = ''
+        -- find closest?
+        local list = windower.ffxi.get_mob_array()
+        local t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
         
-    --     local moblist={"Eschan Bugard","Eschan Tarichuk","Immanibugard"}
-    --     -- get closest mob id
-    --     for each,val in pairs(list) do
-    --         if has_value(moblist, val.name) and val.hpp == 100 then
-    --             if val.distance:sqrt() < adist then
-    --                 aid = val.id
-    --                 aindex = val.index
-    --                 adist = val.distance:sqrt()
-    --                 ax = val.x
-    --                     ay = val.y
-    --                     az = val.z
-    --             end
-    --         else 
-    --         end
-    --     end
-    --     -- target closest mob
-    --     windower.ffxi.run(ax-s.x, ay-s.y, az-s.z)
-    --     windower.send_command('input /targetbnpc')
-    --     -- windower.send_command('setkey f8 up;')
-    -- end
-    -- -- refresh target
-    -- if (s.status == 0 and t) then
-    --     local t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
-    --     if (has_value(moblist, t.name) and (t.id == aid)) then
-    --         windower.send_command('input /follow')
-    --         if t.distance:sqrt() < 30 then
-    --             windower.send_command('input /attack')
-    --         end
-    --     else
-    --         aid = ''
-    --         adist = 50
-    --         aindex = ''
-    --         ax = 0
-    --         ay = 0
-    --         az = 0
-    --         -- find closest?
-    --         local list = windower.ffxi.get_mob_array()
-    --         local t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
+        local moblist={"Eschan Bugard","Eschan Tarichuk","Immanibugard"}
+        -- get closest mob id
+        for each,val in pairs(list) do
+            if has_value(moblist, val.name) and val.hpp == 100 then
+                if val.distance:sqrt() < adist then
+                    aid = val.id
+                    aindex = val.index
+                    adist = val.distance:sqrt()
+                    ax = val.x
+                        ay = val.y
+                        az = val.z
+                end
+            else 
+            end
+        end
+        -- target closest mob
+        windower.ffxi.run(ax-s.x, ay-s.y, az-s.z)
+        windower.send_command('input /targetbnpc')
+        -- windower.send_command('setkey f8 up;')
+    end
+    -- refresh target
+    if (s.status == 0 and t) then
+        local t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
+        if (has_value(moblist, t.name) and (t.id == aid)) then
+            windower.send_command('input /follow')
+            if t.distance:sqrt() < 30 then
+                windower.send_command('input /attack')
+            end
+        else
+            aid = ''
+            adist = 50
+            aindex = ''
+            ax = 0
+            ay = 0
+            az = 0
+            -- find closest?
+            local list = windower.ffxi.get_mob_array()
+            local t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
             
-    --         local moblist={"Eschan Bugard","Eschan Tarichuk","Immanibugard"}
-    --         -- get closest mob id
-    --         for each,val in pairs(list) do
-    --             if has_value(moblist, val.name) and val.hpp == 100 then
-    --                 if val.distance:sqrt() < adist then
-    --                     aid = val.id
-    --                     aindex = val.index
-    --                     adist = val.distance:sqrt()
-    --                     ax = val.x
-    --                     ay = val.y
-    --                     az = val.z
-    --                 end
-    --             else 
-    --             end
-    --         end
-    --         -- target closest mob
-    --         -- run towards closest mob
-    --         -- print(ax,ay,az)
-    --         windower.ffxi.run(ax-s.x, ay-s.y, az-s.z)
-    --         windower.send_command('input /targetbnpc')
-    --         -- windower.send_command('setkey tab down;')
-    --         -- windower.send_command('setkey tab up;')
-    --     end
+            local moblist={"Eschan Bugard","Eschan Tarichuk","Immanibugard"}
+            -- get closest mob id
+            for each,val in pairs(list) do
+                if has_value(moblist, val.name) and val.hpp == 100 then
+                    if val.distance:sqrt() < adist then
+                        aid = val.id
+                        aindex = val.index
+                        adist = val.distance:sqrt()
+                        ax = val.x
+                        ay = val.y
+                        az = val.z
+                    end
+                else 
+                end
+            end
+            -- target closest mob
+            -- run towards closest mob
+            -- print(ax,ay,az)
+            windower.ffxi.run(ax-s.x, ay-s.y, az-s.z)
+            windower.send_command('input /targetbnpc')
+            -- windower.send_command('setkey tab down;')
+            -- windower.send_command('setkey tab up;')
+        end
 
-    -- end
+    end
+end)
+
+windower.register_event('action',function(act)
+    if act.category == 4 then
+        casting = 0
+    end
 end)
 
 debuff = {2,3,4,5,6,7,8,9,11,12,13,14,15,18,19}
