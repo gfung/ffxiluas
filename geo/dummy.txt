@@ -1,0 +1,163 @@
+
+00:53:54 > valid_target    true
+00:53:54 > index   2245
+00:53:54 > claim_id        0
+00:53:54 > race    0
+00:53:54 > hpp     100
+00:53:54 > facing  6.0377478599548
+00:53:54 > is_npc  true
+00:53:54 > in_alliance     true
+00:53:54 > in_party        true
+00:53:54 > charmed true
+00:53:54 > models  table: 2D0401B0
+00:53:54 > entity_type     8
+00:53:54 > target_index    0
+00:53:54 > animation_speed 5
+00:53:54 > spawn_type      14
+00:53:54 > distance        24.583513259888
+00:53:54 > z       0.29962515830994
+00:53:54 > status  0
+00:53:54 > y       -205.07400512695
+00:53:54 > x       429.20199584961
+00:53:54 > name    Shantotto
+00:53:54 > model_scale     1
+00:53:54 > heading 6.0377478599548
+00:53:54 > model_size      1.5
+00:53:54 > id      17959365
+00:53:54 > movement_speed  12.5
+
+00:53:54 > valid_target    false
+00:53:54 > index   565
+00:53:54 > claim_id        0
+00:53:54 > race    0
+00:53:54 > hpp     100
+00:53:54 > facing  1.6935147047043
+00:53:54 > is_npc  true
+00:53:54 > in_alliance     false
+00:53:54 > in_party        false
+00:53:54 > charmed false
+00:53:54 > models  table: 2D03F2D8
+00:53:54 > entity_type     -107
+00:53:54 > target_index    0
+00:53:54 > animation_speed 5
+00:53:54 > spawn_type      2
+00:53:54 > distance        245.34524536133
+00:53:54 > z       2.2117207050323
+00:53:54 > status  0
+00:53:54 > y       -188.51899719238
+00:53:54 > x       -345.99499511719
+00:53:54 > name    Goblin Footprint
+00:53:54 > model_scale     1
+00:53:54 > heading 1.6935147047043
+00:53:54 > model_size      0
+00:53:54 > id      17957429
+00:53:54 > movement_speed  5
+
+00:53:54 > valid_target    false
+00:53:54 > index   581
+00:53:54 > claim_id        0
+00:53:54 > race    0
+00:53:54 > hpp     100
+00:53:54 > facing  2.2825632095337
+00:53:54 > is_npc  true
+00:53:54 > in_alliance     false
+00:53:54 > in_party        false
+00:53:54 > charmed false
+00:53:54 > models  table: 2D03F3F0
+00:53:54 > entity_type     -56
+00:53:54 > target_index    0
+00:53:54 > animation_speed 5
+00:53:54 > spawn_type      2
+00:53:54 > distance        2839.0502929688
+00:53:54 > z       0
+00:53:54 > status  0
+00:53:54 > y       -119.90000152588
+00:53:54 > x       321
+00:53:54 > name    ???
+00:53:54 > model_scale     1
+00:53:54 > heading 2.2825632095337
+00:53:54 > model_size      0
+00:53:54 > id      17957445
+00:53:54 > movement_speed  5
+
+00:53:54 > valid_target    false
+00:53:54 > index   590
+00:53:54 > claim_id        0
+00:53:54 > race    0
+00:53:54 > hpp     100
+00:53:54 > facing  0
+00:53:54 > is_npc  true
+00:53:54 > in_alliance     false
+00:53:54 > in_party        false
+00:53:54 > charmed false
+00:53:54 > models  table: 2D03F418
+00:53:54 > entity_type     0
+00:53:54 > target_index    0
+00:53:54 > animation_speed 5
+00:53:54 > spawn_type      2
+00:53:54 > distance        2845.0573730469
+00:53:54 > z       0.27000001072884
+00:53:54 > status  0
+00:53:54 > y       -148
+00:53:54 > x       246
+00:53:54 > name    Eschan Portal #5
+00:53:54 > model_scale     1
+00:53:54 > heading 0
+00:53:54 > model_size      0
+00:53:54 > id      17957454
+00:53:54 > movement_speed  5
+
+
+00:53:54 > valid_target    false
+00:53:54 > index   304
+00:53:54 > claim_id        0
+00:53:54 > race    0
+00:53:54 > hpp     0
+00:53:54 > facing  3.4115731716156
+00:53:54 > is_npc  true
+00:53:54 > in_alliance     false
+00:53:54 > in_party        false
+00:53:54 > charmed false
+00:53:54 > models  table: 2D03E6D0
+00:53:54 > entity_type     8
+00:53:54 > target_index    0
+00:53:54 > animation_speed 4
+00:53:54 > spawn_type      16
+00:53:54 > distance        2756.5993652344
+00:53:54 > z       0.30603313446045
+00:53:54 > status  3
+00:53:54 > y       -133.78300476074
+00:53:54 > x       341.3869934082
+00:53:54 > name    Eschan Tarichuk
+00:53:54 > model_scale     1
+00:53:54 > heading 3.4115731716156
+00:53:54 > model_size      1.2000000476837
+00:53:54 > id      17957168
+00:53:54 > movement_speed  4
+
+00:53:54 > valid_target    false
+00:53:54 > index   1236
+00:53:54 > claim_id        0
+00:53:54 > race    1
+00:53:54 > hpp     100
+00:53:54 > facing  2.5280001163483
+00:53:54 > is_npc  false
+00:53:54 > in_alliance     false
+00:53:54 > in_party        false
+00:53:54 > charmed false
+00:53:54 > models  table: 2D03FA58
+00:53:54 > entity_type     0
+00:53:54 > target_index    0
+00:53:54 > animation_speed 5
+00:53:54 > spawn_type      1
+00:53:54 > distance        2410.3874511719
+00:53:54 > z       -0.35783690214157
+00:53:54 > status  0
+00:53:54 > y       -150.31146240234
+00:53:54 > x       259.43481445312
+00:53:54 > name    Lightsword
+00:53:54 > model_scale     1
+00:53:54 > heading 2.5280001163483
+00:53:54 > model_size      0.40000000596046
+00:53:54 > id      175390
+00:53:54 > movement_speed  5

@@ -1,0 +1,8 @@
+<?xml version="1.1" ?>
+<settings>
+    <global>
+        <alttrack>true</alttrack>
+        <buffs>sleep,dark arts,rapture,perpetuance,petrified,paralyze,light arts,slow,accession,manifestation,addendum: white,addendum: black,celerity,ebullience,stun,parsimony,alacrity,penury,immanence,silence</buffs>
+        <sitrack>true</sitrack>
+    </global>
+</settings>
