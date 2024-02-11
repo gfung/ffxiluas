@@ -31,6 +31,7 @@ local function has_value (tab, val)
     return false
 end
 
+casting = 0
 debuff = {2,3,4,5,6,7,8,9,11,12,13,14,15,18,19,20,21,30,31,128,129,130,131,132,133,
 134,135,136,137,138,139,140,141,142,144,145,146,147,148,149,
     167,174,175,189,193,194
@@ -50,7 +51,8 @@ local scNum = 0
 local job = windower.ffxi.get_player()
 windower.register_event('tp change', function(new, old)
     if new > 1000 then
-        if job.main_job ==  'RDM' then 
+        if job.main_job ==  'RDM' then
+            casting = 0 
             windower.send_command('input /ws "Chant du Cygne" <t>')
             -- windower.send_command('input /ws "Savage Blade" <t>')
             -- if scNum == 0 then  
@@ -63,6 +65,7 @@ windower.register_event('tp change', function(new, old)
 
         end
         if job.main_job ==  'BLU' then 
+            casting = 0
             windower.send_command('input /ws "Chant du Cygne" <t>')
         end
         if job.main_job ==  'THF' then 
@@ -72,9 +75,11 @@ windower.register_event('tp change', function(new, old)
             if scNum == 0 then  
                 windower.send_command('input /ws "Dragon Kick" <t>')
                 scNum = 1
-            else
+            elseif scNum == 1 then
                 windower.send_command('input /ws "Ascetic\'s Fury" <t>')
-                scNum = 0
+                scNum = 2
+            elseif scNum == 2 then
+                windower.send_command('input /ws "Victory Smite" <t>')
             end
         end
         if job.main_job ==  'NIN' then 
@@ -83,13 +88,13 @@ windower.register_event('tp change', function(new, old)
     end
 end)
 
-casting = 0
 healerCasting = 0
 
 -- local moblist={"Eschan Bugard","Eschan Tarichuk","Immanibugard"}
 local moblist={"Apex Eft"}
 
 windower.register_event('prerender', function()
+    ab = windower.ffxi.get_ability_recasts()
     -- print(casting)
     s = windower.ffxi.get_mob_by_target('me')
     t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
@@ -200,9 +205,12 @@ windower.register_event('prerender', function()
                     windower.send_command('input /ma \"Erratic Flutter\" <me>')
                 end
                 if not has_value(windower.ffxi.get_player().buffs, 604) then
-                    casting = 1
-                    windower.send_command('input /ja \"Unbridled Learning\" <me>')
-                    windower.send_command('input /ma \"Mighty Guard\" <me>')
+                    if (ab[81] == 0) then
+                        casting = 1
+                    -- windower.send_command('setkey  down;')
+                        windower.send_command('input /ja \"Unbridled Learning\" <me> <wait1>;input /ma \"Mighty Guard\" <me>')
+                    -- windower.send_command('input /ma \"Mighty Guard\" <me>')
+                    end
                 end
                 
                 -- if not has_value(windower.ffxi.get_player().buffs, 43) then
@@ -477,7 +485,6 @@ windower.register_event('lose buff', function(id)
     end
     -- casting = 1
 end)
-
 
 windower.register_event('addon command', function(...)
     local cmd = 'none'
