@@ -41,12 +41,13 @@ healerCasting = 0
 local moblist={"Blanched Mandragora"}
 
 isbusy = 0
+-- actionq = []
 
 windower.register_event('prerender', function()
     s = windower.ffxi.get_mob_by_target('me')
-    t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
-    -- windower.send_command('input /target <bt>')
-    -- print(casting)
+    t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('bt')
+    windower.send_command('input /target <bt>')
+    -- print(t)
     -- reset movement keys
     -- windower.send_command('setkey w up;')
     -- windower.send_command('setkey s up;')
@@ -56,6 +57,7 @@ windower.register_event('prerender', function()
     -- we have a target and we are in attack mode
     sp = windower.ffxi.get_spell_recasts()
     ab = windower.ffxi.get_ability_recasts()
+    -- print(ab.vitals)
     -- print(casting, isbusy)
     if isbusy == 0 then
         
@@ -71,13 +73,13 @@ windower.register_event('prerender', function()
         end
         local buffs = windower.ffxi.get_player().buffs
         if not has_value(buffs,612) then
-            local ab = windower.ffxi.get_player()
+            local getPlayerNow = windower.ffxi.get_player()
             isbusy = 1
-            if ab.vitals.mp < 200 then
+            if getPlayerNow.vitals.mp < 200 then
                 windower.send_command('input /ma "Indi-Refresh" <me>')
                 -- casting = 1
             else
-                windower.send_command('input /ma "Indi-Haste" <me>')
+                windower.send_command('input /ma "Indi-Frailty" <me>')
                 -- casting = 1
             end
             isbusy = 0
@@ -375,16 +377,11 @@ windower.register_event('lose buff', function(id)
         casting =0
     end
 
-    -- if (id == 612) then
-    --     -- local ab = windower.ffxi.get_player()
-    --     -- if ab.vitals.mp < 200 then
-    --         windower.send_command('input /ma "Indi-Refresh" <me>')
-    --         casting = 1
-    --     -- else
-    --     --     windower.send_command('input /ma "Indi-Haste" <me>')
-    --     --     casting = 1
-    --     -- end
-    -- end
+    if (id == 612) then
+        -- send buffer command
+        windower.send_command('input /ma "Indi-Refresh" <me>')
+        casting = 1
+    end
 end)
 
 windower.register_event('addon command', function(...)
