@@ -1,20 +1,47 @@
-_addon.commands = {'george', 'gg'}
+_addon.name = 'dps'
+_addon.author = 'aiyah4la'
+_addon.version = '3.0'
+_addon.commands = {'dps', 'dd'}
+
+-- Logging module: writes to dps_log.txt in addon directory
+
+files = require('files')
 
 require('tables')
-require('strings')
-require('logger')
-require('sets')
-local socket = require('socket')
+require('math')
+packets = require('packets')
 
-res = require('resources')
-config = require('config')
-local aid = ''
+local moblist={"Apex Eft"}
+local last_ja_time = {}
+local ja_cooldown = 2
+local aid = nil
 local adist = 40
-local aindex = ''
-
+local aindex = nil
+local ability_frame = 0
+local ability_frame2 = 0
+local ability_frame3 = 0
 local ax = 0
 local ay = 0
-local az = 0
+local cache_timer = 0
+local json_encode
+local active = false
+local wscount = 0
+local aftermath = false
+local savage = false
+local previous_target = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('bt')
+local translate_file = files.new('dpslog.js', true)
+local debuffs = 0
+-- Cache — DLL calls happen elsewhere, prerender only reads
+local cache = {
+    player = nil,
+    me = nil,
+    bt = nil,
+    party = nil,
+    mob_array = nil,
+    recasts = nil,
+    spell_recasts = nil,
+    last_target_index = nil,
+}
 
 local function has_value(tab, val)
     if (tab == nil) then
@@ -30,574 +57,424 @@ local function has_value(tab, val)
     return false
 end
 
-casting = 0
-debuff = {2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 18, 19, 20, 21, 30, 31, 128, 129, 130, 131, 132, 133, 134, 135,
-          136, 137, 138, 139, 140, 141, 142, 144, 145, 146, 147, 148, 149, 167, 174, 175, 189, 193, 194}
-erase = {11, 12, 134, 135, 21, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 144, 145, 146,
-         147, 148, 149, 167, 174, 175}
-
-cursed = {9, 15, 20, 30}
--- Triggers on player status change. This only triggers for the following statuses:
--- Idle, Engaged, Resting, Dead, Zoning
-local scNum = 0
-local job = windower.ffxi.get_player()
-windower.register_event('tp change', function(new, old)
-    if new > 1000 then
-        if job.main_job == 'RDM' then
-            casting = 0
-            windower.send_command('input /ws "Chant du Cygne" <t>')
-            -- windower.send_command('input /ws "Savage Blade" <t>')
-            -- if scNum == 0 then  
-            --     windower.send_command('input /ws "Red Lotus Blade" <t>')
-            --     scNum = 1
-            -- else
-            --     windower.send_command('input /ws "Seraph Blade" <t>')
-            --     scNum = 0
-            -- end
-
-        end
-        if job.main_job == 'PLD' then
-            windower.send_command('input /ws "Chant du Cygne" <t>')
-            casting = 0
-        end
-        if job.main_job == 'BLU' then
-            casting = 0
-            windower.send_command('input /ws "Chant du Cygne" <t>')
-        end
-        if job.main_job == 'THF' then
-            windower.send_command('input /ws "Evisceration" <t>')
-        end
-        if job.main_job == 'MNK' then
-            if scNum == 0 then
-                windower.send_command('input /ws "Ascetic\'s Fury" <t>')
-                scNum = 1
-            elseif scNum == 1 then
-                windower.send_command('input /ws "Victory Smite" <t>')
-                scNum = 2
-            elseif scNum == 2 then
-                windower.send_command('input /ws "Victory Smite" <t>')
-                scNum = 0
-            end
-        end
-        if job.main_job == 'SAM' then
-            if scNum == 0 then
-                windower.send_command('input /ws "Tachi: Yukikaze" <t>')
-                scNum = 1
-            elseif scNum == 1 then
-                windower.send_command('input /ws "Tachi: Gekko" <t>')
-                scNum = 0
-            elseif scNum == 2 then
-                windower.send_command('input /ws "Tachi: Ageha" <t>')
-                scNum = 0
-            end
-        end
-        if job.main_job == 'NIN' then
-            windower.send_command('input /ws "Blade: Ku" <t>')
-        end
+json_encode = function(obj)
+    local t = type(obj)
+    if t == 'string' then
+        return '"' .. obj:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"'
     end
-end)
-
-healerCasting = 0
-
--- local moblist={"Eschan Bugard","Eschan Tarichuk","Immanibugard","Apex Eft","Bight Uragnite",}
-local moblist = {"Apex Eft"}
-local skip = 0
-
-windower.register_event('prerender', function()
-    ab = windower.ffxi.get_ability_recasts()
-    -- print(casting)
-    party = windower.ffxi.get_party()
-    if party.p3.mpp < 10 then
-        skip = 1
+    if t == 'number' or t == 'boolean' then
+        return tostring(obj)
     end
-    if party.p3.mpp > 90 then
-        skip = 0
+    if t == 'nil' then
+        return 'null'
     end
-    s = windower.ffxi.get_mob_by_target('me')
-    t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
-    -- for each,value in pairs(windower.ffxi.get_player().buffs) do
-    --     -- windower.send_command('input /echo debuff# '..value)
-    --     -- windower.send_command('input /echo debuff# '..each..' '..value)
-    --     if has_value(debuff, value) then
-    --         if has_value(cursed,value) then
-    --             windower.send_command('send Tuxxy /ma Cursna '..job.name)
-    --             socket.sleep(1.5)
-    --         end
-    --         if has_value(erase,value) then
-    --             windower.send_command('send Tuxxy /ma Erase '..job.name)
-    --             socket.sleep(1.5)
-    --         end
-    --         if value == 2 or value == 19 then
-    --             windower.send_command('send Tuxxy /ma Cure '..job.name)
-    --             socket.sleep(1.5)
-    --         end
-    --         if value == 3 then
-    --             windower.send_command('send Tuxxy /ma Poisona '..job.name)
-    --             socket.sleep(1.5)
-    --         end
-    --         if value == 4 then
-    --             windower.send_command('send Tuxxy /ma Paralyna '..job.name)
-    --             socket.sleep(1.5)
-    --         end
-    --         if value == 5 then
-    --             windower.send_command('send Tuxxy /ma Blindna '..job.name)
-    --             socket.sleep(1.5)
-    --         end
-    --         if value == 6 then
-    --             windower.send_command('send Tuxxy /ma Silena '..job.name)
-    --             socket.sleep(1.5)
-    --         end
-    --         if value == 7 then
-    --             windower.send_command('send Tuxxy /ma Stona '..job.name)
-    --             socket.sleep(1.5)
-    --         end
-    --         if value == 8 then
-    --             windower.send_command('send Tuxxy /ma Viruna '..job.name)
-    --             socket.sleep(1.5)
-    --         end
-    --     end
-    -- end
-
-    -- reset movement keys
-    windower.send_command('setkey w up;')
-    windower.send_command('setkey s up;')
-    windower.send_command('setkey tab up;')
-    windower.send_command('setkey f8 up;')
-    -- we have a target and we are in attack mode
-    
-        if (t and (s.status == 1)) then
-            if t.distance:sqrt() > 2.3 then
-                windower.send_command('setkey s down;')
-                windower.send_command('setkey s up;')
-                windower.send_command('setkey w down;')
-            else
-                windower.send_command('setkey w up;')
-            end
-
-            if t.distance:sqrt() < 1.8 then
-                windower.send_command('setkey s down;')
-            else
-                windower.send_command('setkey s up;')
-            end
-
-            if job.main_job == 'RDM' then
-                ab = windower.ffxi.get_ability_recasts()
-                if not has_value(windower.ffxi.get_player().buffs, 419) and (ab[50] == 0) then
-                    windower.send_command('input /ja \"Composure\" <me>')
-                end
-                -- check buffs
-
-                if (casting == 0) then
-                    coroutine.sleep(2)
-                    if not has_value(windower.ffxi.get_player().buffs, 33) then
-                        casting = 1
-                        windower.send_command('input /ma \"Haste II\" <me>')
-                    end
-                    if not has_value(windower.ffxi.get_player().buffs, 95) then
-                        casting = 2
-                        windower.send_command('input /ma \"Enblizzard\" <me>')
-                    end
-
-                    if not has_value(windower.ffxi.get_player().buffs, 43) then
-                        casting = 3
-                        windower.send_command('input /ma \"Refresh II\" <me>')
-                    end
-
-                    if not has_value(windower.ffxi.get_player().buffs, 432) then
-                        casting = 4
-                        windower.send_command('input /ma \"Temper\" <me>')
-                    end
-
-                end
-            end
-
-            if job.main_job == 'PLD' then
-                -- ab = windower.ffxi.get_ability_recasts()
-                -- if not has_value(windower.ffxi.get_player().buffs, 419) and (ab[50] == 0) then
-                --     windower.send_command('input /ja \"Composure\" <me>')
-                -- end
-                -- check buffs
-
-                if (casting == 0) then
-                    -- coroutine.sleep(2)
-                    -- if not has_value(windower.ffxi.get_player().buffs, 33) then
-                    --     casting = 1
-                    --     windower.send_command('input /ma \"Haste II\" <me>')
-                    -- end
-                    if not has_value(windower.ffxi.get_player().buffs, 274) then
-                        windower.send_command('input /ma \"Enlight II\" <me>')
-                        casting = 1
-                    end
-
-                    -- if not has_value(windower.ffxi.get_player().buffs, 43) then
-                    --     casting = 3
-                    --     windower.send_command('input /ma \"Refresh II\" <me>')
-                    -- end
-
-                    -- if not has_value(windower.ffxi.get_player().buffs, 432) then
-                    --     casting = 4
-                    --     windower.send_command('input /ma \"Temper\" <me>')
-                    -- end
-
-                end
-            end
-
-            if job.main_job == 'BLU' then
-                --     -- if not has_value(windower.ffxi.get_player().buffs, 419) then
-                --     --     windower.send_command('input /ja \"Composure\" <me>')
-                --     -- end
-                --     -- check buffs
-
-                if (casting == 0) then
-                    if not has_value(windower.ffxi.get_player().buffs, 33) then
-                        casting = 1
-                        windower.send_command('input /ma \"Erratic Flutter\" <me>')
-                    end
-                    if not has_value(windower.ffxi.get_player().buffs, 604) then
-                        if (ab[81] == 0) then
-                            casting = 1
-                            -- windower.send_command('setkey  down;')
-                            windower.send_command(
-                                'input /ja \"Unbridled Learning\" <me> <wait1>;input /ma \"Mighty Guard\" <me>')
-                            -- windower.send_command('input /ma \"Mighty Guard\" <me>')
-                        end
-                    end
-
-                    -- if not has_value(windower.ffxi.get_player().buffs, 43) then
-                    --     windower.send_command('input /ma \"Refresh II\" <me>')
-                    --     casting = 1
-                    -- end
-                else
-                    casting = 0
-                end
-            end
-
-            if job.main_job == 'SAM' then
-                if checkrecastability(138) == 0 then
-                    casting = 0
-                    if ((not has_value(windower.ffxi.get_player().buffs, 353)) and (checkrecastability(138) == 0)) then
-                        if casting == 0 then
-                            windower.send_command('input /ja \"Hasso\" <me>')
-                            casting = 1
-                        end
-                    end
-                end
-
-            end
-
-            if job.main_job == 'MNK' then
-                --     if not has_value(windower.ffxi.get_player().buffs, 56) then
-                --         windower.send_command('input /ja \"Berserk\" <me>')
-                --     end
-                -- if not has_value(windower.ffxi.get_player().buffs, 59) then
-                --     windower.send_command('input /ja \"Focus\" <me>')
-                -- end
-                -- if not has_value(windower.ffxi.get_player().buffs, 60) then
-                --     windower.send_command('input /ja \"Dodge\" <me>')
-                -- end
-                --     if not has_value(windower.ffxi.get_player().buffs, 68) then
-                --         windower.send_command('input /ja \"Warcry\" <me>')
-                -- end
-                -- if not has_value(windower.ffxi.get_player().buffs, 461) then
-                --     windower.send_command('input /ja \"Impetus\" <me>')
-                -- end
-            end
-
-            if job.main_job == 'THF' then
-                -- if checkrecastability(4) == 0 then
-                --     windower.send_command('input /ja "Aggressor" <me>')
-                -- end
-                -- if checkrecastability(2) == 0 then
-                --     windower.send_command('input /ja "Warcry" <me>')
-                -- end
-                -- if checkrecastability(1) == 0 then
-                --     windower.send_command('input /ja "Berserk" <me>')
-                -- end
-                -- if checkrecastability(68) == 0 then
-                --     windower.send_command('input /ja "Feint" <me>')
-                -- end
-            end
-
-        else
+    if t == 'table' then
+        local result = '{'
+        local first = true
+        for k, v in pairs(obj) do
+            if not first then result = result .. ',' end
+            first = false
+            result = result .. '"' .. tostring(k) .. '":' .. json_encode(v)
         end
-
-        -- get new target
-        if skip == 0 then
-        if (s.status == 0 and t == nil) then
-            casting = 0
-            aid = ''
-            adist = 40
-            aindex = ''
-            -- find closest?
-            local list = windower.ffxi.get_mob_array()
-            -- get closest mob id
-            for each, val in pairs(list) do
-                if has_value(moblist, val.name) and val.hpp == 100 then
-                    if val.distance:sqrt() < adist then
-                        aid = val.id
-                        aindex = val.index
-                        adist = val.distance:sqrt()
-                        ax = val.x
-                        ay = val.y
-                        az = val.z
-                    end
-                else
-                end
-            end
-            -- target closest mob
-
-            windower.ffxi.run(ax - s.x, ay - s.y, az - s.z)
-            windower.send_command('input /targetbnpc')
-            windower.send_command('setkey f8 up;')
-        end
-
-        -- refresh target
-        if (s.status == 0 and t) then
-            local t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
-            if (has_value(moblist, t.name) and (t.id == aid)) then
-                windower.send_command('input /follow')
-                if t.distance:sqrt() < 30 then
-                    windower.send_command('input /attack')
-                end
-            else
-                aid = ''
-                adist = 40
-                aindex = ''
-                ax = 0
-                ay = 0
-                az = 0
-                -- find closest?
-                local list = windower.ffxi.get_mob_array()
-                local t = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('st')
-
-                -- get closest mob id
-                for each, val in pairs(list) do
-                    if has_value(moblist, val.name) and val.hpp == 100 then
-                        if val.distance:sqrt() < adist then
-                            aid = val.id
-                            aindex = val.index
-                            adist = val.distance:sqrt()
-                            ax = val.x
-                            ay = val.y
-                            az = val.z
-                        end
-                    else
-                    end
-                end
-                -- target closest mob
-                -- run towards closest mob
-                -- print(ax,ay,az)
-                windower.ffxi.run(ax - s.x, ay - s.y, az - s.z)
-                windower.send_command('input /targetbnpc')
-                -- windower.send_command('setkey tab down;')
-                -- windower.send_command('setkey tab up;')
-            end
-
-        end
+        return result .. '}'
     end
-end)
-
-windower.register_event('action message',
-    function(actor_id, target_id, actor_index, target_index, message_id, param_1, param_2, param_3)
-        if message_id == 17 then
-            casting = 1
-        end
-        if message_id == 18 then
-            casting = 1
-        end
-
-    end)
-
-function checkrecast(spellid)
-    local recasts = windower.ffxi.get_spell_recasts()
-    for eac, val in pairs(recasts) do
-        -- print(eac,val)
-        if eac == spellid then
-            return val
-        end
-    end
+    return '"' .. tostring(obj) .. '"'
 end
 
-function checkrecastability(spellid)
-    local recasts = windower.ffxi.get_ability_recasts()
-    for eac, val in pairs(recasts) do
-        if eac == spellid then
-            -- if checkrecastability(spellid) == 0 then
-            return val
-            -- end
-        end
-    end
+local function checkactivebuffs(player, id)
+    return player and has_value(player.buffs, id) or false
 end
 
-local tierHigh = 'V'
-local tierNext = 'IV'
-function castMB(scid)
-    local recasts = windower.ffxi.get_spell_recasts()
-    if job == 'RDM' or job == 'BLM' then
-        tierHigh = 'V'
-        tierNext = "IV"
-    end
-    if scid == 288 or scid == 291 or scid == 301 or scid == 767 or scid == 769 then
-        if checkrecast(167) == 0 then
-            casting = 5
-            windower.send_command('input /ma "Thunder ' .. tierHigh .. '" <bt>')
-        elseif checkrecast(166) == 0 then
-            casting = 6
-            windower.send_command('input /ma "Fire ' .. tierHigh .. '" <bt>')
-        elseif checkrecast(147) == 0 then
-            casting = 7
-            windower.send_command('input /ma "Thunder ' .. tierNext .. '" <bt>')
-        elseif checkrecast(146) == 0 then
-            casting = 8
-            windower.send_command('input /ma "Fire ' .. tierNext .. '" <bt>')
-        end
-    elseif scid == 289 or scid == 292 or scid == 296 or scid == 768 or scid == 770 then
-        if checkrecast(152) == 0 then
-            casting = 9
-            windower.send_command('input /ma "Blizzard ' .. tierHigh .. '" <bt>')
-        elseif checkrecast(151) == 0 then
-            casting = 1
-            windower.send_command('input /ma "Blizzard ' .. tierNext .. '" <bt>')
-        end
-    elseif scid == 293 or scid == 295 then
-        if checkrecast(147) == 0 then
-            casting = 11
-            windower.send_command('input /ma "Fire ' .. tierHigh .. '" <bt>')
-        elseif checkrecast(146) == 0 then
-            casting = 12
-            windower.send_command('input /ma "Fire ' .. tierNext .. '" <bt>')
-        end
-    elseif scid == 297 then
-        if checkrecast(172) == 0 then
-            casting = 13
-            windower.send_command('input /ma "Water ' .. tierHigh .. '" <bt>')
-        elseif checkrecast(171) == 0 then
-            casting = 14
-            windower.send_command('input /ma "Water ' .. tierNext .. '" <bt>')
-        end
-    elseif scid == 300 then
-        if checkrecast(157) == 0 then
-            casting = 15
-            windower.send_command('input /ma "Aero ' .. tierHigh .. '" <bt>')
-        elseif checkrecast(156) == 0 then
-            casting = 16
-            windower.send_command('input /ma "Aero ' .. tierNext .. '" <bt>')
-        end
-    elseif scid == 299 then
-        if checkrecast(162) == 0 then
-            casting = 17
-            windower.send_command('input /ma "Stone ' .. tierHigh .. '" <bt>')
-        elseif checkrecast(161) == 0 then
-            casting = 18
-            windower.send_command('input /ma "Stone ' .. tierNext .. '" <bt>')
-        end
-    end
+local function checkrecastability(ability_id)
+    return cache.recasts and cache.recasts[ability_id] or 0
 end
 
-local party = windower.ffxi.get_party()
-local partylist = {};
-local partyname = {};
-local i = 0;
-for i = 0, 5 do
-    local person = 'p' .. i
-    if (party[person]) then
-        if party[person].mob then
-            partylist[i] = party[person].mob.id
-        end
-        partyname[i] = party[person].name
-    end
+local function checkrecast(spell_id)
+    return cache.spell_recasts and cache.spell_recasts[spell_id] or 0
 end
 
-windower.register_event('action', function(act)
+local function can_use_ja(name)
+    local now = os.time()
+    local last = last_ja_time[name] or 0
+    if now - last >= ja_cooldown then
+        last_ja_time[name] = now
+        return true
+    end
+    return false
+end
 
-    if act.category == 4 and act.actor_id == partylist[0] then
-        -- print('done casting')
-        casting = 0
+local function aftermathbuffCheck(player)
+    aftermath = player and has_value(player.buffs, 272) or false
+end
+
+local function run_buff_maintenance(player)
+    translate_file:append('BUFF Checking buff maintenance for job \n\n')
+    if (player.sub_job == 'SAM' or player.main_job == 'SAM') and checkrecastability(138) == 0 and not checkactivebuffs(player, 353) and can_use_ja("Hasso") then
+        windower.send_command('input /ja "Hasso" <me>')
+        translate_file:append('BUFF Used Hasso \n\n')
     end
 
-    if act.category == 8 and act.actor_id == partylist[0] then
-        -- print(act.param)
-        if act.param == 28787 then
-            -- print('cancel casting ')
-            casting = 0
-        else
-            -- print('casting ')
-            casting = 19
+    if player.sub_job == 'DRG' then
+        if checkrecastability(159) == 0 and can_use_ja("High Jump") then
+            windower.send_command('input /ja "High Jump" <t>')
+            translate_file:append('BUFF Used High Jump \n\n')
+        end
+        if checkrecastability(158) == 0 and can_use_ja("Jump") then
+            windower.send_command('input /ja "Jump" <t>')
+            translate_file:append('BUFF Used Jump \n\n')
         end
     end
 
-    if job.main_job == 'RDM' then
-        if act.category == 11 then
-            -- if has_value(partylist,act.actor_id) then
-            bt = windower.ffxi.get_mob_by_target('bt')
-            for each, value in pairs(act.targets) do
-                if value.id == bt.id then
-                    for eachh, valuu in pairs(value.actions) do
-                        -- check sc element and do burst here
-                        if (casting == 0) then
-
-                            coroutine.sleep(3)
-                            castMB(valuu.add_effect_message)
-                        end
-                    end
-                    -- print('we do action on target: '..value.action.add_effect_message)
-                end
+    if player.main_job == 'MNK' then
+        local mnk_jas = { [31]="Impetus", [13]="Focus", [14]="Dodge", [22]="Perfect Counter", [21]="Footwork" }
+        for id, name in pairs(mnk_jas) do
+            if checkrecastability(id) == 0 and can_use_ja(name) then
+                windower.send_command('input /ja "'..name..'" <me>')
+                translate_file:append('BUFF Used MNK JA: ' .. name .. '\n\n')
+                break
             end
-            -- end
-        end
-
-        if act.category == 3 then
-            -- print("cast mb7")
-            -- if has_value(partylist,act.actor_id) then
-            -- bt = windower.ffxi.get_mob_by_target('bt')
-            for each, value in pairs(act.targets) do
-                -- if value.id == bt.id then
-                for eachh, valuu in pairs(value.actions) do
-                    -- check sc element and do burst here
-                    -- if (casting == 0) then
-                    coroutine.sleep(3)
-                    -- print("cast mb")
-                    castMB(valuu.add_effect_message)
-                    -- end
-                end
-                -- print('we do action on target: '..value.action.add_effect_message)
-                -- end
-            end
-            -- end
         end
     end
-end)
 
-windower.register_event('lose buff', function(id)
-    if has_value(debuff, id) then
-        healerCasting = 0
-    end
-    if id == 10 then
-        casting = 0
-    end
-    -- casting = 1
-end)
-
-windower.register_event('addon command', function(...)
-    local cmd = 'none'
-    if (#arg > 0) then
-        cmd = arg[1]
-    end
-
-    if (cmd == 't') then
-        local buffs = windower.ffxi.get_player().buffs
-        for each, value in pairs(buffs) do
-            if res.buffs[value].english == 'Haste' then
-                print(value)
-            end
-            -- print(res.buffs[value].english,value)
+    if player.sub_job == 'WAR' or player.main_job == 'WAR' then
+        if checkrecastability(1) == 0 and can_use_ja("Berserk") then
+            windower.send_command('input /ja "Berserk" <me>')
+            translate_file:append('BUFF Used Berserk \n\n')
         end
-
-        -- if (#arg < 2) then
-        -- 	windower.add_to_chat(207, "what did you want to test")
-        -- 	return
+        if checkrecastability(2) == 0 and can_use_ja("Warcry") then
+            windower.send_command('input /ja "Warcry" <me>')
+            translate_file:append('BUFF Used Warcry \n\n')
+        end
+        -- if checkrecastability(4) == 0 and can_use_ja("Aggressor") then
+            -- windower.send_command('input /ja "Aggressor" <me>')
+            -- translate_file:append('BUFF Used Aggressor \n\n')
         -- end
-        -- arg[2]		
+        if player.main_job == 'WAR' then
+            if checkrecastability(11) == 0 and can_use_ja("Blood rage") then
+                windower.send_command('input /ja "Blood rage" <me>')
+                translate_file:append('BUFF Used Blood rage \n\n')
+            end
+            if checkrecastability(9) == 0 and can_use_ja("Restraint") then
+                windower.send_command('input /ja "Restraint" <me>')
+                translate_file:append('BUFF Used Restraint \n\n')
+            end
+            if checkrecastability(8) == 0 and can_use_ja("Retaliation") then
+                windower.send_command('input /ja "Retaliation" <me>')
+                translate_file:append('BUFF Used Retaliation \n\n')
+            end
+        end
+    end
+
+    if player.main_job == 'RDM' then
+        if checkrecastability(50) == 0 and can_use_ja("Composure") then
+            windower.send_command('input /ja "Composure" <me>')
+            -- translate_file:append('BUFF Used Composure \n\n')
+        end
+        local rdm_boofs = { [95]="Enblizzard", [33]="Haste II", [116]="Phalanx" , [432]="Temper II", [43]="Refresh III" }
+        
+        for id, name in pairs(rdm_boofs) do
+            if not checkactivebuffs(cache.player, id) then
+                windower.send_command('input /ma "'..name..'" <me>')
+                -- translate_file:append('BUFF Used RDM JA: ' .. name .. '\n\n')
+                break
+            end
+        end
+    end
+
+    -- if (player.main_job == 'DNC' or player.sub_job == 'DNC') and not checkactivebuffs(player, 370) and checkrecastability(216) == 0 and can_use_ja("Haste Samba") then
+    --     windower.send_command('input /ja "Haste Samba" <me>')
+    --     translate_file:append('BUFF Used Haste Samba \n\n')
+    -- end
+end
+
+local function doWS(tp)
+    local player = windower.ffxi.get_player()
+    if not player then
+        translate_file:append('WS No player data available \n\n')
         return
     end
+
+    local job = player.main_job
+    local ws_name = nil
+
+    translate_file:append('WS Evaluating WS for job=' .. job .. ' tp=' .. tp .. '\n\n')
+
+    if job == 'BST' then
+        ws_name = "Decimation"
+    elseif job == 'BLU' then
+        -- ws_name = "Seraph Blade"
+        if savage then
+            if tp >= 1750 then
+                ws_name = "Savage Blade"
+            end
+        else
+            aftermathbuffCheck(player)
+            if not aftermath and tp == 3000 then
+                ws_name = "Chant du Cygne"
+            end
+            if aftermath then
+                ws_name = "Chant du Cygne"
+            end
+        end
+    elseif job == 'RDM' then
+        if tp >= 1000 then
+            ws_name = "Savage Blade"
+        end
+    elseif job == 'WAR' or job == 'BRD' then
+        if tp >= 1100 then
+            ws_name = "Savage Blade"
+        end
+    elseif job == 'COR' then
+        ws_name = "Evisceration"
+    elseif job == 'THF' then
+        ws_name = "Rudra's Storm"
+    elseif job == 'DNC' then
+        ws_name = "Shark Bite"
+    elseif job == 'MNK' or job == 'PUP' then
+        if checkactivebuffs(player, 406) then
+            ws_name = "Tornado Kick"
+        elseif job == 'PUP' then
+            ws_name = "Stringing Pummel"
+        else
+            if wscount > 0 then
+                wscount = wscount + 1
+                ws_name = "Victory Smite"
+                if wscount >= 3 then
+                    wscount = 0
+                end
+            else
+                ws_name = "Shijin Spiral"
+                wscount = wscount + 1
+            end
+        end
+    elseif job == 'SAM' then
+        -- if poleOn then
+            -- ws_name = "Penta Thrust"
+        -- else
+            ws_name = "Tachi: Jinpu"
+        -- end
+    elseif job == 'NIN' then
+        -- ws_name = "Blade: Hi"
+        if wscount == 0 then
+            wscount = wscount + 1
+            ws_name = "Blade: Rin"
+        elseif wscount == 1 then
+            ws_name = "Blade: Retsu"
+            wscount = wscount + 1
+        elseif wscount == 2 then
+            ws_name = "Blade: Hi"
+            wscount = wscount + 1
+        elseif wscount == 3 then
+            ws_name = "Blade: Hi"
+            wscount = 0
+        end
+    end
+
+    if ws_name then
+        translate_file:append('WS Using WS: ' .. ws_name .. '\n\n')
+        windower.send_command('input /ws "'..ws_name..'" <bt>')
+    else
+        translate_file:append('WS No WS selected for job=' .. job .. '\n\n')
+    end
+end
+
+local function update_cache()
+    cache.player = windower.ffxi.get_player()
+    cache.me = windower.ffxi.get_mob_by_target('me')
+    cache.bt = windower.ffxi.get_mob_by_target('bt')
+    cache.party = windower.ffxi.get_party()
+    -- cache.mob_array = windower.ffxi.get_mob_array()
+    cache.recasts = windower.ffxi.get_ability_recasts()
+    cache.spell_recasts = windower.ffxi.get_spell_recasts()
+end
+
+local function get_nearest_mob()
+    windower.add_to_chat(207, 'Getting nearest mob...')
+    local internallist = windower.ffxi.get_mob_array()
+    local interalplayer = windower.ffxi.get_mob_by_target('me')
+    -- if not internalplayer then windower.add_to_chat(207, 'Player not loaded, skipping.'); return end
+    for _, val in pairs(internallist) do
+        if has_value(moblist, val.name) and val.hpp == 100 then
+            -- translate_file2:append('Mob ID : ' .. val.id .. '\n')
+            -- translate_file2:append('Mob Dist : ' .. val.distance:sqrt() .. '\n\n')
+            if val.distance and val.distance:sqrt() < adist  then
+                aid = val.id
+                aindex = val.index
+                adist = val.distance:sqrt()
+                ax = val.x
+                ay = val.y
+                wscount = 0
+            end
+        end
+    end
+
+    windower.ffxi.follow(aindex)
+    -- coroutine.sleep(0.5)
+    -- windower.send_command('input /targetbnpc;wait 0.1;input /lockon;wait 0.1;input /attack')
+        --- IGNORE ---
+    -- translate_file2:append('===== Final Mob ID : ' .. aid .. ' :: Dist : ' .. adist .. '\n\n')
+end
+
+translate_file:append('INIT Core functions defined, registering event handlers \n\n')
+
+-- WS only — TP only changes while fighting
+windower.register_event('tp change', function(new, old)
+    if new > 999 then
+        doWS(new)
+        previous_target = windower.ffxi.get_mob_by_target('t')
+    end
+    if debuffs == 0 then
+        windower.send_command('input /party db')
+        debuffs = 1
+    end
+    -- update_cache()
 end)
+
+windower.register_event('lose buff', function(buff_id)
+    translate_file:append('BUFF_LOSS Lost buff id=' .. buff_id .. '\n\n')
+    -- windower.add_to_chat(167, '[buff] : ' .. buff_id )
+    if buff_id == 432 then
+        windower.send_command('input /ma "Temper" <me>')
+        -- translate_file:append('BUFF_LOSS Detected loss of Haste buff (buff 33) \n\n')
+    end
+    if buff_id == 95 then
+        windower.send_command('input /ma "Enblizzard" <me>')
+    end
+    if buff_id == 116 then
+        windower.send_command('input /ma "Phalanx" <me>')
+    end
+    if buff_id == 33 and active then
+        if cache.player.main_job == 'RDM' then
+            windower.send_command('input /ma "Haste II" <me>')
+            -- translate_file:append('BUFF_LOSS Sent haste request (buff 33) \n\n')
+        else
+            windower.send_command('input /ma Haste <me>')
+            translate_file:append('BUFF_LOSS Sent haste request (buff 33) \n\n')
+        end
+        windower.send_command('input /p haste')
+        translate_file:append('BUFF_LOSS Sent haste request (buff 33) \n\n')
+    end
+    if buff_id == 214 and active then
+        windower.send_command('input /p march')
+        translate_file:append('BUFF_LOSS Sent march request (buff 214) \n\n')
+    end
+    if buff_id == 198 and active then
+        windower.send_command('input /p minuet')
+        translate_file:append('BUFF_LOSS Sent minuet request (buff 198) \n\n')
+    end
+end)
+
+
+
+windower.register_event('incoming chunk', function(id, data)
+    -- if id == 0x029 then
+    --     local raw_parsed = packets.parse('incoming', data)
+    --     local raw_json = json_encode(raw_parsed)
+    --     -- windower.add_to_chat(8, 'Message: ' .. raw_parsed['Message'])
+    --     -- 4, 154, is out of range 78 is too far away
+    --     if raw_parsed['Message'] == 4 or raw_parsed['Message'] == 78 then
+    --         windower.send_command('input /attack')
+    --     end
+    -- end
+    
+    cache_timer = cache_timer + 10
+    if cache_timer >= 1 then
+        cache_timer = 0
+        update_cache()
+    end
+    if not active then 
+        translate_file:append('INCOMING Dropping - addon not active \n\n')
+        return 
+    end
+    
+    local player = windower.ffxi.get_mob_by_target('me')
+    
+    -- Buff distance maintenance (every 20 packets)
+    ability_frame = ability_frame + 1
+    if ability_frame >= 20 and player and player.status == 1 then
+        translate_file:append('DIST Distance check cycle (frame=' .. ability_frame .. ') \n\n')
+        local target = windower.ffxi.get_mob_by_target('t') or windower.ffxi.get_mob_by_target('bt')
+        if target and not (windower.ffxi.get_player() and windower.ffxi.get_player().target_locked) then
+            windower.send_command('input /lockon')
+            translate_file:append('DIST Used /lockon \n\n')
+        end
+        if target and target.distance and target.distance:sqrt() > 2.3 then
+            windower.ffxi.follow(target.index)
+            -- translate_file:append('DIST', 'Moving forward - target too far')
+        end
+        if target and target.distance and target.distance:sqrt() < 1.8 then
+            windower.ffxi.run(false)
+            -- windower.send_command('setkey s down;wait .1;setkey s up;')
+
+            -- translate_file:append('DIST', 'Moving backward - target too close')
+        end
+    end
+
+    ability_frame2 = ability_frame2 + 1
+    if ability_frame2 >= 60 then
+        ability_frame2 = 0
+        -- windower.add_to_chat(8, 'Running buff maintenance 1... : ' .. player.status)
+        local me = cache.me
+        if me and (me.status == 1 or me.status == 2) and cache.player then
+            translate_file:append('MAINT Running periodic buff maintenance \n\n')
+            run_buff_maintenance(cache.player)
+        end
+    end
+
+    -- only check for kill message packet
+    if id == 0x2D then
+        translate_file:append('KILL Kill message received for target id= \n\n')
+        if data and #data >=20 then
+            translate_file:append('KILL parsing \n\n')
+            local raw_parsed = packets.parse('incoming', data)
+            translate_file:append('KILL checking parsedvalues \n\n')
+            if raw_parsed and raw_parsed['Param 1'] and raw_parsed['Param 1'] >= 4500 and previous_target and raw_parsed['Target'] == previous_target.id then
+                translate_file:append('KILL reset vars \n\n')
+                aid = nil
+                adist = 30
+                aindex = nil
+                debuffs = 0
+                wscount = 0
+            end
+        end
+    end
+
+    -- look for next monster and go after it
+    ability_frame3 = ability_frame3 + 1
+    if ability_frame3 >= 20 then
+        ability_frame3 = 0
+        translate_file:append('20 packets check \n\n')
+        if windower.ffxi.get_player() and windower.ffxi.get_player().vitals.tp == 3000 then
+            doWS(3000)
+        end
+        if active and player.status == 0 and aid == nil then    
+            get_nearest_mob()
+        elseif active and player.status == 0 and aid ~= nil  then
+            translate_file:append('grabbing next target \n\n')
+            windower.send_command('input /targetbnpc;wait 0.2;input /lockon;')
+            if windower.ffxi.get_mob_by_target('t') and (aid == windower.ffxi.get_mob_by_target('t').id) then
+                translate_file:append('TARGET Engaging target id=' .. aid .. '\n\n')
+                windower.send_command('input /follow;wait 0.2;input /attack')
+            else
+                windower.ffxi.follow(aindex)
+            end
+        end
+    end
+end)
+
+windower.register_event('addon command', function(cmd, ...)
+    cmd = cmd and cmd:lower() or nil
+
+    if cmd == 'start' then
+        active = not active
+        windower.add_to_chat(8, 'DD Mode: ' .. (active and 'ON' or 'OFF'))
+    -- elseif cmd == 'assist' then
+    --     assist = not assist
+    --     windower.add_to_chat(8, 'Assist Mode: ' .. (assist and 'ON' or 'OFF'))
+    elseif cmd == 'savage' then
+        savage = not savage
+        windower.add_to_chat(8, 'Savage Mode: ' .. (savage and 'ON' or 'OFF'))
+    end
+end)
+
+translate_file:append('INIT Addon fully initialized \n\n')
